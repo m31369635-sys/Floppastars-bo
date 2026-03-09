@@ -4,7 +4,6 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import asyncio
-import random
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -30,42 +29,34 @@ async def start(message: types.Message):
     if user_id not in users:
         users[user_id] = {
             "floppas": 0.0,
-            "click_power": 0.1,
             "clicks": 0
         }
     
+    invited = invited_count.get(user_id, 0)
     bot_username = (await bot.me()).username
     ref_link = f"https://t.me/{bot_username}?start={user_id}"
-    invited = invited_count.get(user_id, 0)
     
     text = f"""
 😸 Добро пожаловать во FloppaStars! 🐈⭐️
 
-👇 Доступные команды:
-/click - кликнуть на кота
-/withdraw - вывести FLOPPA на Stars
-/balance - мой баланс
+👇 Команды:
+/click - кликнуть на кота (+0.10 FLOPPA)
+/withdraw - вывести звезды (нужно 50 FLOPPA)
+/balance - баланс
 
-👥 Приглашено друзей: {invited}/2
+👥 Друзей: {invited}/2
 🔗 Твоя ссылка: {ref_link}
 """
     await message.answer(text)
-
-@dp.message()
-async def unknown_command(message: types.Message):
-    await message.answer(
-        "❌ Неизвестная команда\n"
-        "Нажми /start"
-    )
 
 @dp.message(Command('click'))
 async def click_cat(message: types.Message):
     user_id = message.from_user.id
     
     if user_id not in users:
-        users[user_id] = {"floppas": 0.0, "click_power": 0.1, "clicks": 0}
+        users[user_id] = {"floppas": 0.0, "clicks": 0}
     
-    users[user_id]["floppas"] += users[user_id]["click_power"]
+    users[user_id]["floppas"] += 0.1
     users[user_id]["clicks"] += 1
     balance = round(users[user_id]["floppas"], 2)
     
@@ -74,10 +65,9 @@ async def click_cat(message: types.Message):
     ])
     
     await message.answer(
-        f"😺 ТЫ КЛИКНУЛ КОТА!\n\n"
-        f"+{users[user_id]['click_power']} FLOPPA\n"
+        f"😺 +0.10 FLOPPA\n"
         f"💰 Баланс: {balance} FLOPPA\n"
-        f"📊 Всего кликов: {users[user_id]['clicks']}",
+        f"📊 Кликов: {users[user_id]['clicks']}",
         reply_markup=keyboard
     )
 
@@ -85,7 +75,10 @@ async def click_cat(message: types.Message):
 async def process_click(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     
-    users[user_id]["floppas"] += users[user_id]["click_power"]
+    if user_id not in users:
+        users[user_id] = {"floppas": 0.0, "clicks": 0}
+    
+    users[user_id]["floppas"] += 0.1
     users[user_id]["clicks"] += 1
     balance = round(users[user_id]["floppas"], 2)
     
@@ -94,10 +87,9 @@ async def process_click(callback: types.CallbackQuery):
     ])
     
     await callback.message.edit_text(
-        f"😺 ТЫ КЛИКНУЛ КОТА!\n\n"
-        f"+{users[user_id]['click_power']} FLOPPA\n"
+        f"😺 +0.10 FLOPPA\n"
         f"💰 Баланс: {balance} FLOPPA\n"
-        f"📊 Всего кликов: {users[user_id]['clicks']}",
+        f"📊 Кликов: {users[user_id]['clicks']}",
         reply_markup=keyboard
     )
     await callback.answer()
@@ -107,75 +99,77 @@ async def balance(message: types.Message):
     user_id = message.from_user.id
     
     if user_id not in users:
-        users[user_id] = {"floppas": 0.0, "click_power": 0.1, "clicks": 0}
+        users[user_id] = {"floppas": 0.0, "clicks": 0}
     
     invited = invited_count.get(user_id, 0)
+    balance = round(users[user_id]["floppas"], 2)
     
-    await message.answer(
-        f"💰 ТВОЙ БАЛАНС\n\n"
-        f"FLOPPA: {round(users[user_id]['floppas'], 2)}\n"
-        f"Кликов: {users[user_id]['clicks']}\n"
-        f"Приглашено друзей: {invited}/2"
-    )
+    text = f"""
+💰 БАЛАНС
+
+FLOPPA: {balance}
+Кликов: {users[user_id]['clicks']}
+Друзей: {invited}/2
+{'✅ Можно выводить 50 FLOPPA!' if balance >= 50 and invited >= 2 else '❌ Нужно 50 FLOPPA и 2 друга'}
+"""
+    await message.answer(text)
 
 @dp.message(Command('withdraw'))
 async def withdraw(message: types.Message):
     user_id = message.from_user.id
     
     if user_id not in users:
-        users[user_id] = {"floppas": 0.0, "click_power": 0.1, "clicks": 0}
+        users[user_id] = {"floppas": 0.0, "clicks": 0}
     
     invited = invited_count.get(user_id, 0)
-    balance = users[user_id]["floppas"]
+    floppas = users[user_id]["floppas"]
     
     if invited < 2:
-        await message.answer(
-            f"❌ Нельзя вывести!\n"
-            f"Нужно пригласить 2 друзей\n"
-            f"Приглашено: {invited}/2"
-        )
+        await message.answer(f"❌ Нужно 2 друга! Приглашено: {invited}/2")
         return
     
-    if balance < 50:
-        await message.answer(
-            f"❌ Нельзя вывести!\n"f"Нужно минимум 50 FLOPPA\n"
-            f"У тебя: {round(balance, 2)} FLOPPA"
-        )
+    if floppas < 50:
+        await message.answer(f"❌ Нужно минимум 50 FLOPPA! У тебя: {floppas}")
         return
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ ПОДТВЕРДИТЬ ВЫВОД", callback_data="confirm_withdraw")],
+        [InlineKeyboardButton(text="✅ ВЫВЕСТИ 50 FLOPPA", callback_data="withdraw_50")],
         [InlineKeyboardButton(text="❌ ОТМЕНА", callback_data="cancel_withdraw")]
     ])
     
     await message.answer(
-        f"💰 ВЫВОД НА STARS\n\n"
-        f"Ты выводишь: 50 FLOPPA\n"
-        f"Получишь: 1 Star\n\n"
-        f"Подтверди вывод:",
+        f"⭐️ ВЫВОД\n\n"
+        f"Ты выведешь: 50 FLOPPA\n"f"Получишь: 50 Stars\n"
+        f"Останется: {round(floppas - 50, 2)} FLOPPA\n\n"
+        f"Подтверди:",
         reply_markup=keyboard
     )
 
-@dp.callback_query(lambda c: c.data == "confirm_withdraw")
-async def confirm_withdraw(callback: types.CallbackQuery):
+@dp.callback_query(lambda c: c.data == "withdraw_50")
+async def withdraw_50(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     users[user_id]["floppas"] -= 50
     
     await callback.message.edit_text(
-        "✅ ВЫВОД ОФОРМЛЕН!\n\n"
-        "1 Star скоро придет тебе в Telegram\n"
-        "Проверь баланс Stars в настройках"
+        f"✅ ГОТОВО!\n\n"
+        f"50 Stars скоро придут в Telegram\n"
+        f"Остаток: {round(users[user_id]['floppas'], 2)} FLOPPA"
     )
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data == "cancel_withdraw")
 async def cancel_withdraw(callback: types.CallbackQuery):
-    await callback.message.edit_text("❌ Вывод отменен")
+    await callback.message.edit_text("❌ Отменено")
     await callback.answer()
 
+@dp.message()
+async def unknown(message: types.Message):
+    await message.answer("❓ Нажми /start")
+
 async def main():
-    print("😸 FloppaStars БОТ ЗАПУЩЕН!")
+    print("🔥 БОТ РАБОТАЕТ!")
+    print("💰 1 клик = 0.10 FLOPPA")
+    print("⭐️ Вывод: 50 FLOPPA = 50 Stars")
     await dp.start_polling(bot)
 
 asyncio.run(main())
-
