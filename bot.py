@@ -1,5 +1,5 @@
 # =====================================
-# ТЕЛЕГРАМ БОТ - 😸 FloppaStars 🐈⭐️
+# ТЕЛЕГРАМ БОТ - FloppaStars ПРАНК
 # =====================================
 
 TOKEN = "8020098998:AAE8TpMt31Wfs1uF6QXKaBDsoiLFmV43cDM"
@@ -14,154 +14,221 @@ from datetime import datetime, timedelta
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-last_opened = {}
+# База данных в памяти
+users = {}  # {user_id: {"floppas": 0.0, "click_power": 0.1, "clicks": 0}}
 
 # =====================================
 # КОМАНДА /start
 # =====================================
 @dp.message(Command('start'))
 async def start(message: types.Message):
+    user_id = message.from_user.id
+    
+    # Регистрируем нового пользователя
+    if user_id not in users:
+        users[user_id] = {
+            "floppas": 0.0,
+            "click_power": 0.1,
+            "clicks": 0
+        }
+    
     text = """
 😸 Добро пожаловать во FloppaStars! 🐈⭐️
 
-🎁 Игра с рулеткой!
+💰 Зарабатывай FLOPPA монеты!
 
-Команды:
-🎲 /freebox - крутить рулетку (раз в 24ч)
-⏰ /time - проверить таймер
-❓ /help - помощь
+👇 КЛИКАЙ НА КОТА 👇
+Каждый клик дает +0.10 FLOPPA
 
-⚡️ Шанс на МИШУ: 1% ⚡️
+📦 Команды:
+/click - кликнуть на кота
+/case - открыть кейс
+/upgrade - улучшить клик
+/balance - мой баланс
 
-Нажми /freebox чтобы крутить!
+🚀 VIP КЕЙСЫ ЗА STARS!
+Только там может выпасть NFT SNOOPDOG!
 """
     await message.answer(text)
 
 # =====================================
-# КОМАНДА /help
+# КЛИК НА КОТА
 # =====================================
-@dp.message(Command('help'))
-async def help(message: types.Message):
-    text = """
-📋 Как играть в FloppaStars:
-
-1. Нажимаешь /freebox
-2. Появляется кнопка "🎰 КРУТИТЬ РУЛЕТКУ"
-3. Нажимаешь и видишь прокрутку: ❌❌🐻❌❌
-4. Если выпал МИША 🐻 - ты победил!
-
-📊 ШАНСЫ:
-• ❌ Крестик - 99%
-• 🐻 Миша - 1% (редкий!)
-
-⏳ Важно: Крутить можно раз в 24 часа!
-"""
-    await message.answer(text)
-
-# =====================================
-# КОМАНДА /freebox
-# =====================================
-@dp.message(Command('freebox'))
-async def freebox(message: types.Message):
+@dp.message(Command('click'))
+async def click_cat(message: types.Message):
     user_id = message.from_user.id
-    now = datetime.now()
     
-    # Проверка времени
-    if user_id in last_opened:
-        diff = now - last_opened[user_id]
-        if diff < timedelta(hours=24):
-            remain = timedelta(hours=24) - diff
-            hours = remain.seconds // 3600
-            minutes = (remain.seconds % 3600) // 60
-            await message.answer(
-                f"⏳ **До следующей попытки:**\n"
-                f"{hours} ч {minutes} мин"
-            )
-            return
+    if user_id not in users:
+        users[user_id] = {"floppas": 0.0, "click_power": 0.1, "clicks": 0}
     
-    # Создаем кнопку для прокрутки
+    # Добавляем флоппы
+    users[user_id]["floppas"] += users[user_id]["click_power"]
+    users[user_id]["clicks"] += 1
+    
+    # Круглый счет до 2 знаков
+    balance = round(users[user_id]["floppas"], 2)
+    
+    # Клавиатура с котом
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎰 КРУТИТЬ РУЛЕТКУ", callback_data="spin")]
+        [InlineKeyboardButton(text="🐱 КЛИК!", callback_data="click")]
     ])
     
     await message.answer(
-        "🎁 **Рулетка FloppaStars готова!**\n"
-        "Нажми кнопку чтобы крутить:",
+        f"😺 **ТЫ КЛИКНУЛ КОТА!**\n\n"
+        f"+{users[user_id]['click_power']} FLOPPA\n"
+        f"💰 Баланс: {balance} FLOPPA\n"
+        f"📊 Всего кликов: {users[user_id]['clicks']}",
+        reply_markup=keyboard
+    )
+
+@dp.callback_query(lambda c: c.data == "click")
+async def process_click(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    
+    users[user_id]["floppas"] += users[user_id]["click_power"]
+    users[user_id]["clicks"] += 1
+    balance = round(users[user_id]["floppas"], 2)
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🐱 КЛИК!", callback_data="click")]
+    ])
+    
+    await callback.message.edit_text(
+        f"😺 **ТЫ КЛИКНУЛ КОТА!**\n\n"
+        f"+{users[user_id]['click_power']} FLOPPA\n"
+        f"💰 Баланс: {balance} FLOPPA\n"
+        f"📊 Всего кликов: {users[user_id]['clicks']}",
+        reply_markup=keyboard
+    )
+    await callback.answer()
+
+# =====================================
+# ВЫБОР КЕЙСА
+# =====================================
+@dp.message(Command('case'))
+async def case_menu(message: types.Message):
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📦 КЕЙС ЗА FLOPPA (50 🪙)", callback_data="case_floppa")],
+        [InlineKeyboardButton(text="⭐️ VIP КЕЙС (10 ⭐️)", callback_data="case_stars")]
+    ])
+    
+    await message.answer(
+        "🎁 **ВЫБЕРИ КЕЙС:**\n\n"
+        "📦 Обычный кейс - 50 FLOPPA\n"
+        "   Шанс на выигрыш: **0%**\n\n"
+        "⭐️ VIP кейс - 10 Telegram Stars\n"
+        "   🎨 NFT SNOOPDOG - ШАНС 0%\n"
+        "   ❌ Пусто - ШАНС 100%\n"
+        "   (Покупается за реальные деньги!)",
         reply_markup=keyboard
     )
 
 # =====================================
-# ПРОКРУТКА РУЛЕТКИ
+# ОБЫЧНЫЙ КЕЙС (50 FLOPPA)
 # =====================================
-@dp.callback_query(lambda c: c.data == "spin")
-async def spin_roulette(callback: types.CallbackQuery):
+@dp.callback_query(lambda c: c.data == "case_floppa")
+async def open_floppa_case(callback: types.CallbackQuery):
     user_id = callback.from_user.id
+    price = 50
     
-    # Запоминаем время
-    last_opened[user_id] = datetime.now()
+    if users[user_id]["floppas"] < price:
+        await callback.message.edit_text("❌ Недостаточно FLOPPA! Больше кликай!")
+        return
     
-    # Создаем рулетку из 10 символов
-    symbols = []
-    bear_count = 0
+    # Списываем флоппы
+    users[user_id]["floppas"] -= price
     
-    # Генерируем 10 случайных результатов с 1% шансом на медведя
-    for i in range(10):
-        if random.randint(1, 100) <= 1:  # 1% шанс на Мишу!
-            symbols.append("🐻")
-            bear_count += 1
-        else:
-            symbols.append("❌")
+    # 100% НИЧЕГО
+    result = "❌ НИЧЕГО! Попробуй еще!"
     
-    # Собираем строку для прокрутки
-    spin_result = " ".join(symbols)
+    # Анимация
+    animation = "🎰 Крутим обычный кейс...\n❌ ❌ ❌ ❌ ❌\n\n"
     
-    # Определяем результат
-    if bear_count >= 1:
-        result_text = f"🎉 УРА! МИША! Выпало {bear_count} Миш(а)! 🐻\nЭто 1% удачи!"
-    else:
-        result_text = "😢 **В этот раз не повезло...**\n1% шанс на Мишу - попробуй через 24 часа!"
-    
-    # Отправляем результат
     await callback.message.edit_text(
-        f"**😸 FloppaStars РУЛЕТКА:**\n\n"
-        f"{spin_result}\n\n"
-        f"{result_text}\n\n"
-        f"⏰ Следующая попытка через 24 часа"
+        f"{animation}{result}\n\n"
+        f"💰 Осталось: {round(users[user_id]['floppas'], 2)} FLOPPA"
     )
-    
     await callback.answer()
 
 # =====================================
-# КОМАНДА /time
+# VIP КЕЙС ЗА STARS (10 ⭐️)
 # =====================================
-@dp.message(Command('time'))
-async def check_time(message: types.Message):
+@dp.callback_query(lambda c: c.data == "case_stars")
+async def open_stars_case(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    
+    # Анимация VIP крутки
+    animation = "⭐️ VIP КЕЙС (10 STARS) ⭐️\n\n"
+    animation += "🎰 Крутим...\n"
+    animation += "❌ ❌ ❌ ❌ ❌\n"
+    animation += "🎨 ❌ ❌ ❌ ❌\n\n"
+    
+    # 100% пусто, 0% NFT
+    result = "❌ **НИЧЕГО НЕ ВЫПАЛО!**\n"
+    result += "🎨 NFT SNOOPDOG даже не показался...\n\n"
+    result += "Повезет в следующий раз! 🍀"
+    
+    await callback.message.edit_text(
+        f"{animation}{result}"
+    )
+    await callback.answer()
+
+# =====================================
+# УЛУЧШЕНИЯ
+# =====================================
+@dp.message(Command('upgrade'))
+async def upgrade(message: types.Message):
+    user_id = message.from_user.id
+    current_power = users[user_id]["click_power"]
+    next_power = round(current_power + 0.02, 2)
+    price = int(current_power * 1000)  # Цена растет
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"⬆️ УЛУЧШИТЬ ({price} FLOPPA)", callback_data="upgrade")]
+    ])
+    
+    await message.answer(
+        f"🔧 **МАГАЗИН УЛУЧШЕНИЙ**\n\n"
+        f"Текущий клик: +{current_power} FLOPPA\n"
+        f"Следующий уровень: +{next_power} FLOPPA\n"
+        f"Цена: {price} FLOPPA",
+        reply_markup=keyboard
+    )
+
+@dp.callback_query(lambda c: c.data == "upgrade")
+async def process_upgrade(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    current_power = users[user_id]["click_power"]
+    price = int(current_power * 1000)
+    
+    if users[user_id]["floppas"] < price:
+        await callback.answer("❌ Недостаточно FLOPPA!", show_alert=True)
+        return
+    
+    # Списываем деньги
+    users[user_id]["floppas"] -= price
+    # Улучшаем клик
+    users[user_id]["click_power"] = round(current_power + 0.02, 2)
+    
+    await callback.message.edit_text(
+        f"✅ **УЛУЧШЕНО!**\n\n"
+        f"Теперь клик дает +{users[user_id]['click_power']} FLOPPA\n"
+        f"💰 Баланс: {round(users[user_id]['floppas'], 2)} FLOPPA"
+    )
+    await callback.answer()
+
+# =====================================
+# БАЛАНС
+# =====================================
+@dp.message(Command('balance'))
+async def balance(message: types.Message):
     user_id = message.from_user.id
     
-    if user_id in last_opened:
-        diff = datetime.now() - last_opened[user_id]
-        if diff < timedelta(hours=24):
-            remain = timedelta(hours=24) - diff
-            hours = remain.seconds // 3600
-            minutes = (remain.seconds % 3600) // 60
-
-            await message.answer(
-                f"⏳ **До следующей попытки:**\n"
-                f"{hours} ч {minutes} мин"
-            )
-        else:
-            await message.answer("✅ Можно крутить! /freebox")
-    else:
-        await message.answer("✅ Можно крутить! /freebox")
-
-# =====================================
-# ОСТАЛЬНЫЕ СООБЩЕНИЯ
-# =====================================
-@dp.message()
-async def unknown(message: types.Message):
     await message.answer(
-        "❓ Неизвестная команда\n"
-        "Используй /start или /help"
+        f"💰 **ТВОЙ БАЛАНС**\n\n"
+        f"FLOPPA: {round(users[user_id]['floppas'], 2)}\n"
+        f"Кликов: {users[user_id]['clicks']}\n"
+        f"Сила клика: +{users[user_id]['click_power']}"
     )
 
 # =====================================
@@ -169,14 +236,13 @@ async def unknown(message: types.Message):
 # =====================================
 async def main():
     print("=" * 40)
-    print("😸 FloppaStars РУЛЕТКА 🐈⭐️")
+    print("😸 FloppaStars ПРАНК БОТ")
     print("=" * 40)
-    print("✅ Бот @FloppaStar_Bot запущен!")
-    print("🐻 Шанс на МИШУ: 1%")
-    print("❌ Шанс на крестик: 99%")
-    print("🎲 Рулетка: 10 символов")
-    print("=" * 40)
-    print("👀 Окно не закрывать!")
+    print("✅ Бот запущен!")
+    print("📦 Обычный кейс: 50 FLOPPA - 0%")
+    print("⭐️ VIP кейс: 10 Stars - 100% пусто")
+    print("🎨 NFT SNOOPDOG: только в VIP, шанс 0%")
+    print("💰 Кликай на кота!")
     print("=" * 40)
     
     await dp.start_polling(bot)
